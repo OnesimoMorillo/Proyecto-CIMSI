@@ -1,6 +1,3 @@
-# Node modules
-node_modules/
-
 # Logs
 logs
 *.log
@@ -8,45 +5,20 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+lerna-debug.log*
 
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
+node_modules
+dist
+dist-ssr
+*.local
 
-# Environment variables
-.env
-.env.local
-.env.*.local
-
-# Build output
-dist/
-build/
-coverage/
-
-# Dependency directories
-jspm_packages/
-
-# IDEs y editores
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Sistema operativo
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
 .DS_Store
-Thumbs.db
-
-# TypeScript
-*.tsbuildinfo
-
-# Optional cache directories
-.npm
-.yarn/cache
-.yarn/unplugged
-.yarn/build-state.yml
-.yarn/install-state.gz
-
-# Otros
-*.tgz
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
