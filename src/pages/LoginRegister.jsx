@@ -1,9 +1,9 @@
 // src/components/auth/LoginRegister.jsx
 import React, { useState } from 'react';
 
-const API_URL = 'http://localhost:3307/api';
+const API_URL = 'http://localhost:3000/api';
 
-export default function LoginRegister({ onLoginSuccess }) {
+export default function LoginRegister({ onLoginSuccess}) {
     const [isLogin, setIsLogin] = useState(true);
 
     return (
@@ -146,12 +146,13 @@ function RegisterForm({ onRegisterSuccess }) {
         setLoading(true);
 
         try {
+            console.log("Antes de enviar")
             const response = await fetch(`${API_URL}/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, email, password }),
             });
-
+            console.log("Despues de enviar")
             const data = await response.json();
 
             if (!response.ok) {

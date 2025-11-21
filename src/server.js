@@ -6,7 +6,7 @@ import jwt from 'jsonwebtoken';
 import mysql from 'mysql2/promise';
 
 const app = express();
-const PORT = 3307;
+const PORT = 3000;
 const JWT_SECRET = 'tu_clave_secreta_muy_segura'; // Cambiar en producción
 
 const corsOptions = {
@@ -35,7 +35,8 @@ const pool = mysql.createPool({
 // ==================== REGISTRO ====================
 app.post('/api/register', async (req, res) => {
     const { username, email, password } = req.body;
-
+    console.log('--- DATOS RECIBIDOS EN REGISTRO ---');
+    console.log(req.body);
     try {
         // Verificar si el usuario ya existe
         const [existing] = await pool.query(
@@ -146,37 +147,6 @@ app.get('/api/profile', verifyToken, async (req, res) => {
     res.json({ user: req.user });
 });
 
-//app.listen(PORT, () => {
-//    console.log(`Servidor corriendo en http://localhost:${PORT}`);
-//});
-
-async function checkDbConnectionAndStartServer() {
-    let connection;
-    try {
-        // Intenta obtener una conexión del pool
-        connection = await pool.getConnection(); 
-        
-        console.log('✅ Conexión exitosa a MySQL (DB: proyecto_cimsi_db)');
-        
-        // Ejecutar el servidor SOLO si la conexión a la DB es exitosa
-        app.listen(PORT, () => {
-            console.log(`🚀 Servidor Express corriendo en http://localhost:${PORT}`);
-        });
-
-    } catch (error) {
-        // Si hay un error, lo imprimimos y NO iniciamos el servidor
-        console.error('❌ ERROR CRÍTICO DE CONEXIÓN A BASE DE DATOS:');
-        console.error('Asegúrese de que su servidor MySQL esté activo y las credenciales sean correctas.');
-        
-        // Muestra el error original de MySQL
-        console.error(error); 
-        process.exit(1); // Sale del proceso Node.js con error
-        
-    } finally {
-        // Asegúrate de liberar la conexión después de la prueba
-        if (connection) connection.release(); 
-    }
-}
-
-// Llama a la función para iniciar el proceso
-checkDbConnectionAndStartServer();
+app.listen(PORT, () => {
+    console.log(`Servidor corriendo en http://localhost:${PORT}`);
+});
