@@ -1,29 +1,16 @@
 // src/components/auth/LoginRegister.jsx
 import React, { useState } from 'react';
-// IMPORTANTE: Asegúrate de que el CSS esté importado globalmente
-// (Normalmente en main.jsx o App.jsx, pero aquí solo usamos las clases)
 
-// NO NECESITAS DEFINIR CONSTANTES DE COLOR AQUÍ si usas variables CSS
-// const primaryDark = 'bg-gray-900'; 
-// const secondaryDark = 'bg-gray-800'; 
-// const accentColor = 'bg-indigo-600 hover:bg-indigo-700'; 
+const API_URL = 'http://localhost:3307/api';
 
-
-export default function LoginRegister() {
-    const [isLogin, setIsLogin] = useState(true); 
-
-    const toggleForm = () => {
-        setIsLogin(!isLogin);
-    };
+export default function LoginRegister({ onLoginSuccess }) {
+    const [isLogin, setIsLogin] = useState(true);
 
     return (
         <div className="auth-container">
             <div className="auth-card">
-                <h1 className="auth-title">
-                    ♛ Chess Online
-                </h1>
+                <h1 className="auth-title">♛ Chess Online</h1>
                 
-                {/* Selector de Pestaña */}
                 <div className="tab-selector">
                     <button
                         onClick={() => setIsLogin(true)}
@@ -39,12 +26,15 @@ export default function LoginRegister() {
                     </button>
                 </div>
 
-                {isLogin ? <LoginForm /> : <RegisterForm />}
+                {isLogin ? (
+                    <LoginForm onLoginSuccess={onLoginSuccess} />
+                ) : (
+                    <RegisterForm onRegisterSuccess={() => setIsLogin(true)} />
+                )}
 
-                {/* Pie de página con link de alternancia */}
                 <p className="auth-footer">
                     {isLogin ? "¿No tienes cuenta? " : "¿Ya tienes cuenta? "}
-                    <button onClick={toggleForm}>
+                    <button onClick={() => setIsLogin(!isLogin)}>
                         {isLogin ? "Regístrate aquí" : "Inicia Sesión"}
                     </button>
                 </p>
@@ -53,95 +43,170 @@ export default function LoginRegister() {
     );
 }
 
-// Componente para Iniciar Sesión (RF-002)
-function LoginForm() {
+// ==================== LOGIN FORM ====================
+function LoginForm({ onLoginSuccess }) {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        console.log('Login intentado:', { username, password });
+        setError('');
+        setLoading(true);
+
+        try {
+            const response = await fetch(`${API_URL}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Error al iniciar sesión');
+            }
+
+            // Guardar token y datos del usuario
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('user', JSON.stringify(data.user));
+
+            // Callback de éxito
+            if (onLoginSuccess) {
+                onLoginSuccess(data.user);
+            }
+
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
         <form onSubmit={handleSubmit}>
+            {error && <div className="error-message">{error}</div>}
+            
             <div className="form-group">
-                <label className="form-label">
-                    Nombre de Usuario
-                </label>
+                <label className="form-label">Nombre de Usuario</label>
                 <input
                     type="text"
                     required
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     className="form-input"
+                    disabled={loading}
                 />
             </div>
             <div className="form-group">
-                <label className="form-label">
-                    Contraseña
-                </label>
+                <label className="form-label">Contraseña</label>
                 <input
                     type="password"
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="form-input"
+                    disabled={loading}
                 />
             </div>
-            <button
-                type="submit"
-                className="submit-button"
-            >
-                Iniciar Sesión
+            <button type="submit" className="submit-button" disabled={loading}>
+                {loading ? 'Iniciando...' : 'Iniciar Sesión'}
             </button>
         </form>
     );
 }
 
-// Componente para Registro de Usuario (RF-001)
-function RegisterForm() {
-    // ... Estados y lógica
+// ==================== REGISTER FORM ====================
+function RegisterForm({ onRegisterSuccess }) {
     const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
-    
-    const handleSubmit = (e) => {
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        console.log('Registro intentado:', { username, email, password, confirmPassword });
+        setError('');
+        setSuccess('');
+
+        // Validaciones del frontend
+        if (password !== confirmPassword) {
+            setError('Las contraseñas no coinciden');
+            return;
+        }
+
+        if (password.length < 6) {
+            setError('La contraseña debe tener al menos 6 caracteres');
+            return;
+        }
+
+        setLoading(true);
+
+        try {
+            const response = await fetch(`${API_URL}/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, email, password }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Error al registrar');
+            }
+
+            setSuccess('¡Registro exitoso! Ahora puedes iniciar sesión.');
+            
+            // Limpiar formulario
+            setUsername('');
+            setEmail('');
+            setPassword('');
+            setConfirmPassword('');
+
+            // Cambiar a login después de 2 segundos
+            setTimeout(() => {
+                if (onRegisterSuccess) onRegisterSuccess();
+            }, 2000);
+
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
         <form onSubmit={handleSubmit}>
+            {error && <div className="error-message">{error}</div>}
+            {success && <div className="success-message">{success}</div>}
+            
             <div className="form-group">
-                <label className="form-label">
-                    Nombre de Usuario (Único)
-                </label>
+                <label className="form-label">Nombre de Usuario (Único)</label>
                 <input
                     type="text"
                     required
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     className="form-input"
+                    disabled={loading}
                 />
             </div>
             <div className="form-group">
-                <label className="form-label">
-                    Email
-                </label>
+                <label className="form-label">Email</label>
                 <input
                     type="email"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="form-input"
+                    disabled={loading}
                 />
             </div>
             <div className="form-group">
-                <label className="form-label">
-                    Contraseña (Mín. 6 chars)
-                </label>
+                <label className="form-label">Contraseña (Mín. 6 chars)</label>
                 <input
                     type="password"
                     required
@@ -149,12 +214,11 @@ function RegisterForm() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="form-input"
+                    disabled={loading}
                 />
             </div>
             <div className="form-group">
-                <label className="form-label">
-                    Confirmar Contraseña
-                </label>
+                <label className="form-label">Confirmar Contraseña</label>
                 <input
                     type="password"
                     required
@@ -162,13 +226,11 @@ function RegisterForm() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className="form-input"
+                    disabled={loading}
                 />
             </div>
-            <button
-                type="submit"
-                className="submit-button"
-            >
-                Registrarse
+            <button type="submit" className="submit-button" disabled={loading}>
+                {loading ? 'Registrando...' : 'Registrarse'}
             </button>
         </form>
     );
