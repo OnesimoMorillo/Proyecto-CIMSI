@@ -1,42 +1,167 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
+/* src/App.css */
+
+/* 1. Variables y Reset Básico */
+:root {
+  --color-primary-dark: #1f2937; /* Gris muy oscuro, casi negro */
+  --color-secondary-dark: #111827; /* Negro profundo para fondo */
+  --color-accent: #4f46e5; /* Índigo */
+  --color-accent-hover: #4338ca; /* Índigo más oscuro para hover */
+  --color-text-light: #f3f4f6; /* Texto claro */
+  --color-text-muted: #9ca3af; /* Gris para texto secundario */
+}
+
+/* Aplicar el tema oscuro global */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  background-color: var(--color-secondary-dark); /* Fondo profundo */
+  color: var(--color-text-light);
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* 2. Contenedor Principal (Centrado) */
+.auth-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  /* Efecto de degradado sutil */
+  background: linear-gradient(135deg, var(--color-secondary-dark) 0%, #0c1017 100%);
+}
+
+/* 3. Tarjeta de Formulario */
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  padding: 30px;
+  background-color: var(--color-primary-dark);
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 0 1px #374151; /* Sombra profunda y borde sutil */
+  border: 1px solid #374151;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.auth-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.7), 0 0 0 1px #4f46e550;
+}
+
+/* 4. Título y Separador */
+.auth-title {
   text-align: center;
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: #818cf8; /* Índigo más claro para contraste */
+  margin-bottom: 25px;
+  letter-spacing: 1px;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+/* 5. Selector de Pestaña (Login/Register) */
+.tab-selector {
+  display: flex;
+  margin-bottom: 25px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid #374151;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.tab-button {
+  flex-grow: 1;
+  padding: 12px 0;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.3s, color 0.3s;
+  background-color: var(--color-primary-dark);
+  color: var(--color-text-muted);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.tab-button.active {
+  background-color: var(--color-accent);
+  color: var(--color-text-light);
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.3);
 }
 
-.card {
-  padding: 2em;
+.tab-button:not(.active):hover {
+    background-color: #374151;
 }
 
-.read-the-docs {
-  color: #888;
+/* 6. Inputs de Formulario */
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--color-text-muted);
+}
+
+.form-input {
+  width: 100%;
+  padding: 12px 15px;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  background-color: #374151;
+  color: var(--color-text-light);
+  font-size: 1rem;
+  transition: border-color 0.3s, box-shadow 0.3s;
+  box-sizing: border-box; /* Asegura que el padding no desborde el ancho */
+}
+
+.form-input::placeholder {
+    color: #6b7280;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.5); /* Anillo de foco */
+}
+
+/* 7. Botón de Enviar (Submit) */
+.submit-button {
+  width: 100%;
+  padding: 15px;
+  border: none;
+  border-radius: 8px;
+  background-color: var(--color-accent);
+  color: white;
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s;
+  margin-top: 20px;
+}
+
+.submit-button:hover {
+  background-color: var(--color-accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 5px 15px rgba(79, 70, 229, 0.4);
+}
+
+/* 8. Pie de Página / Link de Alternancia */
+.auth-footer {
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  margin-top: 20px;
+}
+
+.auth-footer button {
+  background: none;
+  border: none;
+  color: #818cf8;
+  cursor: pointer;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.auth-footer button:hover {
+    color: var(--color-accent);
 }
