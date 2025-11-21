@@ -1,4 +1,8 @@
-CREATE TABLE users (
+CREATE DATABASE IF NOT EXISTS proyecto_cimsi_db;
+
+USE proyecto_cimsi_db;
+
+CREATE TABLE IF NOT EXISTS users (
 	id INT AUTO_INCREMENT,
 	username VARCHAR(255) UNIQUE NOT NULL,
 	email VARCHAR(255) NOT NULL,
