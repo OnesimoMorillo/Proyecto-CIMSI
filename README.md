@@ -5,14 +5,21 @@ Servidor para partidas online de ajedrez entre dos jugadores.
 ## 📦 Instalación
 
 Antes de arrancar el servidor:
-    1) Instalar node
-    2) Ejecutar el siguiente comando:
+    1. Instalar node
+    2. Ejecutar el siguiente comando:
         npm install
+    3. Abrir HeidiSQL
+        1. Crear un usuario llamado usuarioCimsi
+        2. Ejecutar el script 'creacionDBcimsi-prueba.sql'
+        3. Dar Permisos al usuario sobre la DB
 
 ## 🎮 Ejecutar el proyecto
 
 Una vez realizados los pasos anteriores ejecutar el siguiente comando para arrancar el servidor:
     npm run dev
+
+Abrir otra terminal y ejecutar el siguiente comando para arrancar el servidor de la DB:
+    node ./src/server.js
 
 El proyecto estará disponible en: http://localhost:5173/
 
