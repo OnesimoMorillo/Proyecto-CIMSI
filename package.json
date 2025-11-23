@@ -6,7 +6,7 @@
   "scripts": {
     "start": "concurrently \" npm run dev \" \" npm run dbServer \"",
     "dev": "vite",
-    "dbServer": "node ./src/server.js",
+    "dbServer": "node ./src/database/server.js",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"

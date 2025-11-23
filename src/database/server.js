@@ -1,4 +1,3 @@
-// server.js
 import express from 'express';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
@@ -35,8 +34,7 @@ const pool = mysql.createPool({
 // ==================== REGISTRO ====================
 app.post('/api/register', async (req, res) => {
     const { username, email, password } = req.body;
-    console.log('--- DATOS RECIBIDOS EN REGISTRO ---');
-    console.log(req.body);
+
     try {
         // Verificar si el usuario ya existe
         const [existing] = await pool.query(
@@ -148,5 +146,5 @@ app.get('/api/profile', verifyToken, async (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Servidor corriendo en http://localhost:${PORT}`);
+    console.log(`Servidor de la base de datos corriendo en http://localhost:${PORT}`);
 });
