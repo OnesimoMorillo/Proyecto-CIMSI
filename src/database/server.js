@@ -1,26 +1,32 @@
 import 'dotenv/config';
-
 import express from 'express';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import mysql from 'mysql2/promise';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 
 const app = express();
+const httpServer = createServer(app);
 const PORT = 3000;
 const JWT_SECRET = 'tu_clave_secreta_muy_segura'; // Cambiar en producción
 
+// Configurar CORS
 const corsOptions = {
-    // Permitir SÓLO tu origen de Frontend (Vite)
-    origin: 'http://localhost:5173', 
+    origin: ['http://localhost:5173', 'http://192.168.209.15:5173'],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    credentials: true, // Permitir cookies/headers de autenticación
-    allowedHeaders: ['Content-Type', 'Authorization'], // Headers que permites
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
 app.use(cors(corsOptions));
-
 app.use(express.json());
+
+// Configurar Socket.IO
+const io = new Server(httpServer, {
+    cors: corsOptions
+});
 
 // Conexión a la base de datos
 const pool = mysql.createPool({
@@ -33,12 +39,154 @@ const pool = mysql.createPool({
     connectionLimit: 10,
 });
 
-// ==================== REGISTRO ====================
+// ==================== GESTIÓN DE PARTIDAS ====================
+const games = new Map(); // Almacena las partidas activas
+const waitingPlayers = []; // Jugadores esperando partida
+
+io.on('connection', (socket) => {
+    console.log(`✅ Usuario conectado: ${socket.id}`);
+
+    // Jugador busca partida
+    socket.on('find-game', (userData) => {
+        console.log(`🔍 ${userData.username} busca partida`);
+        
+        // Si hay alguien esperando, crear partida
+        if (waitingPlayers.length > 0) {
+            const opponent = waitingPlayers.shift();
+            const gameId = `game-${Date.now()}`;
+            
+            // Asignar colores aleatoriamente
+            const isPlayer1White = Math.random() > 0.5;
+            
+            const game = {
+                id: gameId,
+                white: isPlayer1White ? socket.id : opponent.id,
+                black: isPlayer1White ? opponent.id : socket.id,
+                whiteUser: isPlayer1White ? userData : opponent.userData,
+                blackUser: isPlayer1White ? opponent.userData : userData,
+                fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', // Posición inicial
+                turn: 'w',
+                history: []
+            };
+            
+            games.set(gameId, game);
+            
+            // Unir ambos jugadores a la sala
+            socket.join(gameId);
+            opponent.socket.join(gameId);
+            
+            // Notificar a ambos jugadores
+            io.to(socket.id).emit('game-start', {
+                gameId,
+                color: isPlayer1White ? 'white' : 'black',
+                opponent: opponent.userData,
+                fen: game.fen
+            });
+            
+            io.to(opponent.id).emit('game-start', {
+                gameId,
+                color: isPlayer1White ? 'black' : 'white',
+                opponent: userData,
+                fen: game.fen
+            });
+            
+            console.log(`🎮 Partida creada: ${gameId}`);
+            console.log(`  ⚪ Blancas: ${game.whiteUser.username}`);
+            console.log(`  ⚫ Negras: ${game.blackUser.username}`);
+            
+        } else {
+            // Añadir a lista de espera
+            waitingPlayers.push({
+                id: socket.id,
+                socket: socket,
+                userData: userData
+            });
+            socket.emit('waiting-opponent');
+            console.log(`⏳ ${userData.username} en lista de espera`);
+        }
+    });
+
+    // Movimiento realizado
+    socket.on('make-move', ({ gameId, move, newFen }) => {
+        const game = games.get(gameId);
+        if (!game) return;
+        
+        // Verificar que sea el turno del jugador correcto
+        const isWhiteTurn = game.turn === 'w';
+        const isPlayerWhite = socket.id === game.white;
+        
+        if ((isWhiteTurn && !isPlayerWhite) || (!isWhiteTurn && isPlayerWhite)) {
+            socket.emit('invalid-move', 'No es tu turno');
+            return;
+        }
+        
+        // Actualizar estado del juego
+        game.fen = newFen;
+        game.turn = game.turn === 'w' ? 'b' : 'w';
+        game.history.push(move);
+        
+        // Enviar movimiento al oponente
+        socket.to(gameId).emit('opponent-move', { move, newFen });
+        
+        console.log(`♟️  Movimiento en ${gameId}: ${move}`);
+    });
+
+    // Jugador ofrece empate
+    socket.on('offer-draw', ({ gameId }) => {
+        socket.to(gameId).emit('draw-offered');
+    });
+
+    // Jugador acepta empate
+    socket.on('accept-draw', ({ gameId }) => {
+        io.to(gameId).emit('game-ended', { result: 'draw' });
+        games.delete(gameId);
+    });
+
+    // Jugador se rinde
+    socket.on('resign', ({ gameId }) => {
+        const game = games.get(gameId);
+        if (!game) return;
+        
+        const winner = socket.id === game.white ? 'black' : 'white';
+        io.to(gameId).emit('game-ended', { result: 'resignation', winner });
+        games.delete(gameId);
+    });
+
+    // Cancelar búsqueda
+    socket.on('cancel-search', () => {
+        const index = waitingPlayers.findIndex(p => p.id === socket.id);
+        if (index !== -1) {
+            waitingPlayers.splice(index, 1);
+            console.log(`❌ Búsqueda cancelada por ${socket.id}`);
+        }
+    });
+
+    // Desconexión
+    socket.on('disconnect', () => {
+        console.log(`❌ Usuario desconectado: ${socket.id}`);
+        
+        // Remover de lista de espera
+        const waitingIndex = waitingPlayers.findIndex(p => p.id === socket.id);
+        if (waitingIndex !== -1) {
+            waitingPlayers.splice(waitingIndex, 1);
+        }
+        
+        // Notificar oponente si estaba en partida
+        games.forEach((game, gameId) => {
+            if (game.white === socket.id || game.black === socket.id) {
+                socket.to(gameId).emit('opponent-disconnected');
+                games.delete(gameId);
+                console.log(`🔌 Partida ${gameId} terminada por desconexión`);
+            }
+        });
+    });
+});
+
+// ==================== RUTAS REST (LOGIN/REGISTER) ====================
 app.post('/api/register', async (req, res) => {
     const { username, email, password } = req.body;
 
     try {
-        // Verificar si el usuario ya existe
         const [existing] = await pool.query(
             'SELECT * FROM users WHERE username = ? OR email = ?',
             [username, email]
@@ -50,10 +198,8 @@ app.post('/api/register', async (req, res) => {
             });
         }
 
-        // Encriptar contraseña
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Insertar usuario
         const [result] = await pool.query(
             'INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
             [username, email, hashedPassword]
@@ -65,21 +211,15 @@ app.post('/api/register', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('--- ERROR EN REGISTRO DE USUARIO ---');
-        console.error(error); // Imprime el objeto de error completo.
-        console.error('------------------------------------');
-
-        // Envía la respuesta 500 para evitar que el navegador se cuelgue
-        res.status(500).json({ error: 'Error interno del servidor. Consulte los logs.' });
+        console.error('Error en registro:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
 
-// ==================== LOGIN ====================
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
 
     try {
-        // Buscar usuario
         const [users] = await pool.query(
             'SELECT * FROM users WHERE username = ?',
             [username]
@@ -92,8 +232,6 @@ app.post('/api/login', async (req, res) => {
         }
 
         const user = users[0];
-
-        // Verificar contraseña
         const validPassword = await bcrypt.compare(password, user.password);
 
         if (!validPassword) {
@@ -102,7 +240,6 @@ app.post('/api/login', async (req, res) => {
             });
         }
 
-        // Generar token JWT
         const token = jwt.sign(
             { userId: user.id, username: user.username },
             JWT_SECRET,
@@ -125,28 +262,8 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// Middleware para verificar token (para rutas protegidas)
-const verifyToken = (req, res, next) => {
-    const token = req.headers['authorization']?.split(' ')[1];
-    
-    if (!token) {
-        return res.status(403).json({ error: 'Token requerido' });
-    }
-
-    jwt.verify(token, JWT_SECRET, (err, decoded) => {
-        if (err) {
-            return res.status(401).json({ error: 'Token inválido' });
-        }
-        req.user = decoded;
-        next();
-    });
-};
-
-// Ruta protegida de ejemplo
-app.get('/api/profile', verifyToken, async (req, res) => {
-    res.json({ user: req.user });
-});
-
-app.listen(PORT, () => {
-    console.log(`Servidor de la base de datos corriendo en http://localhost:${PORT}`);
+// Iniciar servidor HTTP (no app.listen)
+httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Servidor corriendo en http://192.168.209.15:${PORT}`);
+    console.log(`🎮 Socket.IO listo para conexiones`);
 });

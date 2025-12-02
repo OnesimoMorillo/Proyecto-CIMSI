@@ -8,7 +8,8 @@ export default defineConfig({
     host: true,
     allowedHosts: [
       "blotchy-oratorically-krystina.ngrok-free.dev",
-      "localhost"
+      "localhost",
+      "192.168.209.15"
     ]
   }
 })
