@@ -12,9 +12,11 @@ const httpServer = createServer(app);
 const PORT = 3000;
 const JWT_SECRET = 'tu_clave_secreta_muy_segura'; // Cambiar en producción
 
+const SERVER_URL = process.env.SERVER_URL || 'http://localhost:5173';
+
 // Configurar CORS
 const corsOptions = {
-    origin: ['http://localhost:5173', 'http://192.168.209.15:5173'],
+    origin: SERVER_URL,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -264,6 +266,6 @@ app.post('/api/login', async (req, res) => {
 
 // Iniciar servidor HTTP (no app.listen)
 httpServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Servidor corriendo en http://192.168.209.15:${PORT}`);
+    console.log(`🚀 Servidor corriendo en ${SERVER_URL}`);
     console.log(`🎮 Socket.IO listo para conexiones`);
 });

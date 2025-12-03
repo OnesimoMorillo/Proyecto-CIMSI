@@ -6,7 +6,7 @@ import LoginRegister from './pages/LoginRegister';
 import './styles/App.css';
 
 // Conectar al servidor Socket.IO
-const SOCKET_URL = 'http://192.168.209.15:3000'; // Cambiar por tu servidor
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL ||'http://localhost:3000';
 const socket = io(SOCKET_URL, {
     autoConnect: false
 });
