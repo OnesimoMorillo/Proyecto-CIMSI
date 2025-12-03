@@ -6,24 +6,23 @@ function Board({ gameData, socket, user, onGameEnd }) {
     const [game, setGame] = useState(new Chess(gameData.fen));
     const [myColor, setMyColor] = useState(gameData.color);
     const [boardOrientation, setBoardOrientation] = useState(gameData.color === 'white' ? 'white' : 'black');
+    
+    // Estados para la promoción del peón
+    const [showPromotionDialog, setShowPromotionDialog] = useState(false);
+    const [promotionMove, setPromotionMove] = useState(null);
 
     useEffect(() => {
-        // Escuchar movimientos del oponente
         socket.on('opponent-move', ({ move, newFen }) => {
             const gameCopy = new Chess(newFen);
             setGame(gameCopy);
-            
-            // Verificar fin de juego
             checkGameEnd(gameCopy);
         });
 
-        // Oponente se desconectó
         socket.on('opponent-disconnected', () => {
             alert('Tu oponente se ha desconectado. Has ganado por abandono.');
             onGameEnd();
         });
 
-        // Juego terminado
         socket.on('game-ended', ({ result, winner }) => {
             if (result === 'draw') {
                 alert('La partida ha terminado en empate.');
@@ -57,42 +56,64 @@ function Board({ gameData, socket, user, onGameEnd }) {
         }, 100);
     }
 
+    function isPromotion(sourceSquare, targetSquare) {
+        const piece = game.get(sourceSquare);
+        if (!piece || piece.type !== 'p') return false;
+        
+        const targetRank = targetSquare[1];
+        return (piece.color === 'w' && targetRank === '8') || 
+               (piece.color === 'b' && targetRank === '1');
+    }
+
     function onDrop(sourceSquare, targetSquare) {
-        // Verificar que sea tu turno
         const isMyTurn = (game.turn() === 'w' && myColor === 'white') || 
                         (game.turn() === 'b' && myColor === 'black');
         
-        if (!isMyTurn) {
-            return false;
+        if (!isMyTurn) return false;
+
+        // Verificar si es una promoción
+        if (isPromotion(sourceSquare, targetSquare)) {
+            setPromotionMove({ from: sourceSquare, to: targetSquare });
+            setShowPromotionDialog(true);
+            return false; // Prevenir el movimiento hasta que se elija la pieza
         }
 
+        return makeMove(sourceSquare, targetSquare, null);
+    }
+
+    function makeMove(from, to, promotion) {
         const gameCopy = new Chess(game.fen());
         
         try {
             const move = gameCopy.move({
-                from: sourceSquare,
-                to: targetSquare,
-                promotion: 'q'
+                from,
+                to,
+                promotion: promotion || undefined
             });
 
             if (move === null) return false;
 
             setGame(gameCopy);
 
-            // Enviar movimiento al servidor
             socket.emit('make-move', {
                 gameId: gameData.gameId,
                 move: move.san,
                 newFen: gameCopy.fen()
             });
 
-            // Verificar fin de juego
             checkGameEnd(gameCopy);
-
             return true;
         } catch (error) {
             console.error('Error en el movimiento:', error);
             return false;
+        }
+    }
+
+    function handlePromotion(piece) {
+        if (promotionMove) {
+            makeMove(promotionMove.from, promotionMove.to, piece);
+            setShowPromotionDialog(false);
+            setPromotionMove(null);
         }
     }
 
@@ -114,8 +135,85 @@ function Board({ gameData, socket, user, onGameEnd }) {
             minHeight: '100vh',
             background: 'linear-gradient(135deg, #0f2027 0%, #202443ff 50%, #0c0e0eff 100%)',
             padding: '20px',
-            gap: '20px'
+            gap: '20px',
+            position: 'relative'
         }}>
+            {/* Diálogo de Promoción */}
+            {showPromotionDialog && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 9999
+                }}>
+                    <div style={{
+                        backgroundColor: '#1f2937',
+                        padding: '30px',
+                        borderRadius: '15px',
+                        boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
+                        border: '2px solid #4CAF50'
+                    }}>
+                        <h2 style={{ 
+                            color: 'white', 
+                            marginBottom: '20px',
+                            textAlign: 'center'
+                        }}>
+                            Elige la pieza de promoción
+                        </h2>
+                        <div style={{ 
+                            display: 'flex', 
+                            gap: '15px',
+                            justifyContent: 'center'
+                        }}>
+                            {['q', 'r', 'b', 'n'].map(piece => (
+                                <button
+                                    key={piece}
+                                    onClick={() => handlePromotion(piece)}
+                                    style={{
+                                        width: '80px',
+                                        height: '80px',
+                                        fontSize: '48px',
+                                        backgroundColor: '#374151',
+                                        border: '2px solid #4CAF50',
+                                        borderRadius: '10px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.3s',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.target.style.backgroundColor = '#4CAF50';
+                                        e.target.style.transform = 'scale(1.1)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.target.style.backgroundColor = '#374151';
+                                        e.target.style.transform = 'scale(1)';
+                                    }}
+                                >
+                                    {piece === 'q' ? '♕' : piece === 'r' ? '♖' : 
+                                     piece === 'b' ? '♗' : '♘'}
+                                </button>
+                            ))}
+                        </div>
+                        <div style={{
+                            marginTop: '15px',
+                            textAlign: 'center',
+                            color: '#9ca3af',
+                            fontSize: '14px'
+                        }}>
+                            Reina - Torre - Alfil - Caballo
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Info del oponente */}
             <div style={{
                 padding: '15px 30px',

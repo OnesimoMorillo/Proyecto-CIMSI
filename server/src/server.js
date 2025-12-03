@@ -10,11 +10,10 @@ import { Server } from 'socket.io';
 const app = express();
 const httpServer = createServer(app);
 const PORT = 3000;
-const JWT_SECRET = 'tu_clave_secreta_muy_segura'; // Cambiar en producción
+const JWT_SECRET = 'tu_clave_secreta_muy_segura';
 
 const SERVER_URL = process.env.SERVER_URL || 'http://localhost:5173';
 
-// Configurar CORS
 const corsOptions = {
     origin: SERVER_URL,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
@@ -25,12 +24,10 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// Configurar Socket.IO
 const io = new Server(httpServer, {
     cors: corsOptions
 });
 
-// Conexión a la base de datos
 const pool = mysql.createPool({
     host: process.env.DB_HOST || 'localhost',
     user: process.env.DB_USER || 'usuarioCimsi',
@@ -41,63 +38,70 @@ const pool = mysql.createPool({
     connectionLimit: 10,
 });
 
-// ==================== GESTIÓN DE PARTIDAS ====================
-const games = new Map(); // Almacena las partidas activas
-const waitingPlayers = []; // Jugadores esperando partida
+// ==================== GESTIÓN DE PARTIDAS Y SALAS ====================
+const games = new Map();
+const waitingPlayers = [];
+const rooms = new Map(); // roomId -> { creator, password, players: [] }
+
+function generateRoomCode() {
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
+function createGame(player1, player2, gameId) {
+    const isPlayer1White = Math.random() > 0.5;
+    
+    const game = {
+        id: gameId,
+        white: isPlayer1White ? player1.id : player2.id,
+        black: isPlayer1White ? player2.id : player1.id,
+        whiteUser: isPlayer1White ? player1.userData : player2.userData,
+        blackUser: isPlayer1White ? player2.userData : player1.userData,
+        fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+        turn: 'w',
+        history: []
+    };
+    
+    games.set(gameId, game);
+    
+    player1.socket.join(gameId);
+    player2.socket.join(gameId);
+    
+    io.to(player1.id).emit('game-start', {
+        gameId,
+        color: isPlayer1White ? 'white' : 'black',
+        opponent: player2.userData,
+        fen: game.fen
+    });
+    
+    io.to(player2.id).emit('game-start', {
+        gameId,
+        color: isPlayer1White ? 'black' : 'white',
+        opponent: player1.userData,
+        fen: game.fen
+    });
+    
+    console.log(`🎮 Partida creada: ${gameId}`);
+    console.log(`  ⚪ Blancas: ${game.whiteUser.username}`);
+    console.log(`  ⚫ Negras: ${game.blackUser.username}`);
+}
 
 io.on('connection', (socket) => {
     console.log(`✅ Usuario conectado: ${socket.id}`);
 
-    // Jugador busca partida
+    // ========== PARTIDA ALEATORIA ==========
     socket.on('find-game', (userData) => {
-        console.log(`🔍 ${userData.username} busca partida`);
+        console.log(`🔍 ${userData.username} busca partida aleatoria`);
         
-        // Si hay alguien esperando, crear partida
         if (waitingPlayers.length > 0) {
             const opponent = waitingPlayers.shift();
             const gameId = `game-${Date.now()}`;
             
-            // Asignar colores aleatoriamente
-            const isPlayer1White = Math.random() > 0.5;
-            
-            const game = {
-                id: gameId,
-                white: isPlayer1White ? socket.id : opponent.id,
-                black: isPlayer1White ? opponent.id : socket.id,
-                whiteUser: isPlayer1White ? userData : opponent.userData,
-                blackUser: isPlayer1White ? opponent.userData : userData,
-                fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', // Posición inicial
-                turn: 'w',
-                history: []
-            };
-            
-            games.set(gameId, game);
-            
-            // Unir ambos jugadores a la sala
-            socket.join(gameId);
-            opponent.socket.join(gameId);
-            
-            // Notificar a ambos jugadores
-            io.to(socket.id).emit('game-start', {
-                gameId,
-                color: isPlayer1White ? 'white' : 'black',
-                opponent: opponent.userData,
-                fen: game.fen
-            });
-            
-            io.to(opponent.id).emit('game-start', {
-                gameId,
-                color: isPlayer1White ? 'black' : 'white',
-                opponent: userData,
-                fen: game.fen
-            });
-            
-            console.log(`🎮 Partida creada: ${gameId}`);
-            console.log(`  ⚪ Blancas: ${game.whiteUser.username}`);
-            console.log(`  ⚫ Negras: ${game.blackUser.username}`);
-            
+            createGame(
+                { id: socket.id, socket, userData },
+                opponent,
+                gameId
+            );
         } else {
-            // Añadir a lista de espera
             waitingPlayers.push({
                 id: socket.id,
                 socket: socket,
@@ -108,12 +112,98 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Movimiento realizado
+    // ========== CREAR SALA ==========
+    socket.on('create-room', ({ userData, password }) => {
+        const roomId = generateRoomCode();
+        
+        rooms.set(roomId, {
+            id: roomId,
+            creator: {
+                id: socket.id,
+                socket,
+                userData
+            },
+            password: password || null,
+            isPrivate: !!password,
+            players: [],
+            createdAt: Date.now()
+        });
+        
+        socket.emit('room-created', { roomId, password });
+        console.log(`🏠 Sala creada: ${roomId} por ${userData.username} ${password ? '(privada)' : '(pública)'}`);
+        
+        // Enviar lista de salas públicas a todos
+        broadcastPublicRooms();
+    });
+
+    // ========== LISTAR SALAS PÚBLICAS ==========
+    socket.on('get-public-rooms', () => {
+        const publicRooms = Array.from(rooms.values())
+            .filter(room => !room.isPrivate && room.players.length === 0)
+            .map(room => ({
+                id: room.id,
+                creator: room.creator.userData.username,
+                players: room.players.length
+            }));
+        
+        socket.emit('public-rooms-list', publicRooms);
+    });
+
+    // ========== UNIRSE A SALA ==========
+    socket.on('join-room', ({ roomId, password, userData }) => {
+        const room = rooms.get(roomId);
+        
+        if (!room) {
+            socket.emit('room-error', 'Sala no encontrada');
+            return;
+        }
+        
+        if (room.creator.id === socket.id) {
+            socket.emit('room-error', 'No puedes unirte a tu propia sala');
+            return;
+        }
+        
+        if (room.players.length > 0) {
+            socket.emit('room-error', 'La sala está llena');
+            return;
+        }
+        
+        if (room.isPrivate && room.password !== password) {
+            socket.emit('room-error', 'Contraseña incorrecta');
+            return;
+        }
+        
+        // Crear partida
+        const gameId = `room-${roomId}-${Date.now()}`;
+        
+        createGame(
+            room.creator,
+            { id: socket.id, socket, userData },
+            gameId
+        );
+        
+        // Eliminar sala
+        rooms.delete(roomId);
+        console.log(`🎮 Jugador ${userData.username} se unió a sala ${roomId}`);
+        
+        // Actualizar lista de salas públicas
+        broadcastPublicRooms();
+    });
+
+    // ========== CANCELAR SALA ==========
+    socket.on('cancel-room', ({ roomId }) => {
+        if (rooms.has(roomId)) {
+            rooms.delete(roomId);
+            console.log(`❌ Sala ${roomId} cancelada`);
+            broadcastPublicRooms();
+        }
+    });
+
+    // ========== MOVIMIENTOS ==========
     socket.on('make-move', ({ gameId, move, newFen }) => {
         const game = games.get(gameId);
         if (!game) return;
         
-        // Verificar que sea el turno del jugador correcto
         const isWhiteTurn = game.turn === 'w';
         const isPlayerWhite = socket.id === game.white;
         
@@ -122,29 +212,23 @@ io.on('connection', (socket) => {
             return;
         }
         
-        // Actualizar estado del juego
         game.fen = newFen;
         game.turn = game.turn === 'w' ? 'b' : 'w';
         game.history.push(move);
         
-        // Enviar movimiento al oponente
         socket.to(gameId).emit('opponent-move', { move, newFen });
-        
         console.log(`♟️  Movimiento en ${gameId}: ${move}`);
     });
 
-    // Jugador ofrece empate
     socket.on('offer-draw', ({ gameId }) => {
         socket.to(gameId).emit('draw-offered');
     });
 
-    // Jugador acepta empate
     socket.on('accept-draw', ({ gameId }) => {
         io.to(gameId).emit('game-ended', { result: 'draw' });
         games.delete(gameId);
     });
 
-    // Jugador se rinde
     socket.on('resign', ({ gameId }) => {
         const game = games.get(gameId);
         if (!game) return;
@@ -154,7 +238,6 @@ io.on('connection', (socket) => {
         games.delete(gameId);
     });
 
-    // Cancelar búsqueda
     socket.on('cancel-search', () => {
         const index = waitingPlayers.findIndex(p => p.id === socket.id);
         if (index !== -1) {
@@ -163,7 +246,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Desconexión
     socket.on('disconnect', () => {
         console.log(`❌ Usuario desconectado: ${socket.id}`);
         
@@ -172,6 +254,16 @@ io.on('connection', (socket) => {
         if (waitingIndex !== -1) {
             waitingPlayers.splice(waitingIndex, 1);
         }
+        
+        // Eliminar salas creadas por este usuario
+        rooms.forEach((room, roomId) => {
+            if (room.creator.id === socket.id) {
+                rooms.delete(roomId);
+                console.log(`🗑️ Sala ${roomId} eliminada por desconexión`);
+            }
+        });
+        
+        broadcastPublicRooms();
         
         // Notificar oponente si estaba en partida
         games.forEach((game, gameId) => {
@@ -184,7 +276,19 @@ io.on('connection', (socket) => {
     });
 });
 
-// ==================== RUTAS REST (LOGIN/REGISTER) ====================
+function broadcastPublicRooms() {
+    const publicRooms = Array.from(rooms.values())
+        .filter(room => !room.isPrivate && room.players.length === 0)
+        .map(room => ({
+            id: room.id,
+            creator: room.creator.userData.username,
+            players: room.players.length
+        }));
+    
+    io.emit('public-rooms-list', publicRooms);
+}
+
+// ==================== RUTAS REST ====================
 app.post('/api/register', async (req, res) => {
     const { username, email, password } = req.body;
 
@@ -264,7 +368,6 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// Iniciar servidor HTTP (no app.listen)
 httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Servidor corriendo en ${SERVER_URL}`);
     console.log(`🎮 Socket.IO listo para conexiones`);
