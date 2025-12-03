@@ -1,40 +1,20 @@
 {
   "name": "proyecto-cimsi",
+  "version": "1.0.0",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "description": "Servidor para partidas online de ajedrez entre dos jugadores",
   "scripts": {
-    "start": "concurrently \" npm run dev \" \" npm run dbServer \"",
-    "dev": "vite",
-    "dbServer": "node ./src/database/server.js",
-    "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
+    "dev:client": "cd client && npm run dev",
+    "dev:server": "cd server && npm run dev",
+    "install:all": "npm install && cd client && npm install && cd ../server && npm install",
+    "build": "cd client && npm run build",
+    "start": "cd server && npm start"
   },
-  "dependencies": {
-    "bcryptjs": "^3.0.3",
-    "chess.js": "^1.0.0-beta.8",
-    "cors": "^2.8.5",
-    "dotenv": "^17.2.3",
-    "express": "^5.1.0",
-    "jsonwebtoken": "^9.0.2",
-    "mysql2": "^3.15.3",
-    "react": "^19.2.0",
-    "react-chessboard": "^4.7.3",
-    "react-dom": "^19.2.0",
-    "socket.io": "^4.8.1",
-    "socket.io-client": "^4.8.1"
-  },
+  "keywords": ["chess", "online", "multiplayer"],
+  "author": "",
+  "license": "ISC",
   "devDependencies": {
-    "@eslint/js": "^9.39.1",
-    "@types/react": "^19.2.2",
-    "@types/react-dom": "^19.2.2",
-    "@vitejs/plugin-react": "^5.1.0",
-    "concurrently": "^9.2.1",
-    "eslint": "^9.39.1",
-    "eslint-plugin-react-hooks": "^7.0.1",
-    "eslint-plugin-react-refresh": "^0.4.24",
-    "globals": "^16.5.0",
-    "vite": "^7.2.2"
+    "concurrently": "^9.2.1"
   }
 }
