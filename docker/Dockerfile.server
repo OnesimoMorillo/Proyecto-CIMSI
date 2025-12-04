@@ -1,0 +1,19 @@
+# Dockerfile para el Servidor (Node.js + Express + Socket.IO)
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copiar archivos de dependencias
+COPY server/package*.json ./
+
+# Instalar dependencias
+RUN npm ci --only=production
+
+# Copiar código fuente
+COPY server/ ./
+
+# Exponer puerto del servidor
+EXPOSE 3000
+
+# Comando para iniciar el servidor
+CMD ["npm", "start"]

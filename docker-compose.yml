@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # Base de datos MySQL
+  db:
+    image: mysql:8.0
+    container_name: chess_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${DB_NAME:-proyecto_cimsi_db}
+      MYSQL_USER: ${DB_USER:-usuarioCimsi}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-cimsi}
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./sql/creacionDBcimsi-prueba.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - chess_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 5s
+      retries: 10
+
+  # Servidor Backend
+  server:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.server
+    container_name: chess_server
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      DB_HOST: db
+      DB_USER: ${DB_USER:-usuarioCimsi}
+      DB_PASSWORD: ${DB_PASSWORD:-cimsi}
+      DB_NAME: ${DB_NAME:-proyecto_cimsi_db}
+      DB_PORT: 3306
+      SERVER_URL: ${SERVER_URL:-http://localhost:5173}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - chess_network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Cliente Frontend
+  client:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.client
+      args:
+        VITE_SOCKET_URL: ${VITE_SOCKET_URL:-http://localhost:3000}
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000/api}
+    container_name: chess_client
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - server
+    networks:
+      - chess_network
+
+networks:
+  chess_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local
