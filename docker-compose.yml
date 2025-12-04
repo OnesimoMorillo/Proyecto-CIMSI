@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # Base de datos MySQL
   db:
-    image: mysql:8.0
+    image: mysql:5.7
     container_name: chess_db
     restart: unless-stopped
     environment:
