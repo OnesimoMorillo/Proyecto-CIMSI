@@ -80,19 +80,19 @@ proyecto-cimsi/
 Crea un archivo `.env` en la raíz del proyecto con las siguientes variables:
 ```dotenv
 # Configuración de Base de Datos
-DB_HOST=localhost
-DB_USER=usuarioCimsi
-DB_PASSWORD=cimsi
-DB_NAME=proyecto_cimsi_db
-DB_PORT=3307
-MYSQL_ROOT_PASSWORD=rootpassword
+DB_HOST=```host de la db```
+DB_USER=```usuario de la db```
+DB_PASSWORD=```contraseña db```
+DB_NAME=```nombre de la db```
+DB_PORT=```puerto de la db```
+MYSQL_ROOT_PASSWORD=```contraseña usuario root db```
 
 # URL del servidor (frontend)
-SERVER_URL=http://localhost:5173
+SERVER_URL=```direción ip del servidor```
 
 # URLs para el cliente (Vite)
-VITE_SOCKET_URL=http://localhost:3000
-VITE_API_URL=http://localhost:3000/api
+VITE_SOCKET_URL=```direción ip del servidor```:3000
+VITE_API_URL=```direción ip del servidor```:3000/api
 ```
 
 ### 2. Instalación de Dependencias
@@ -379,4 +379,3 @@ netstat -ano | findstr :5173
 - Comprobar que el servidor esté ejecutándose
 
 
----
