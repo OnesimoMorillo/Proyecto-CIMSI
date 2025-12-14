@@ -10,9 +10,9 @@ import { Server } from 'socket.io';
 const app = express();
 const httpServer = createServer(app);
 const PORT = 3000;
-const JWT_SECRET = 'tu_clave_secreta_muy_segura';
+const JWT_SECRET = process.env.JWT_SECRET || 'default';
 
-const SERVER_URL = process.env.SERVER_URL || 'http://localhost:5173';
+const SERVER_URL = process.env.SERVER_URL;
 
 const corsOptions = {
     origin: SERVER_URL,
@@ -33,7 +33,7 @@ const pool = mysql.createPool({
     user: process.env.DB_USER || 'usuarioCimsi',
     password: process.env.DB_PASSWORD || 'cimsi',
     database: process.env.DB_NAME || 'proyecto_cimsi_db',
-    port: process.env.DB_PORT || 3307,
+    port: process.env.DB_PORT || 3306,
     waitForConnections: true,
     connectionLimit: 10,
 });
