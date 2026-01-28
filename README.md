@@ -1,4 +1,4 @@
-# Proyecto CIMSI
+# Proyecto ChessOnline
 
 Servidor para partidas online de ajedrez entre dos jugadores.
 
